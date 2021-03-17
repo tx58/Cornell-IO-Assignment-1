@@ -1,23 +1,30 @@
 function f= BlpSupply(theta)
-    global S halton r beta_1 beta_2
+    global S halton r beta_1 beta_3
     load data_blp.mat
     % Step1. draw from distribution parameter theta
     meanvalue= theta(1);
-    variance= theta(2);
-    mu=log(meanvalue^2/sqrt(variance+meanvalue^2));
-    sigma=sqrt(log(variance/meanvalue^2+1));
+    std= theta(2);
+    mu=log(meanvalue/sqrt(1+std^2/meanvalue^2));
+    sigma=sqrt(log(std^2/meanvalue^2+1));
     %[mu,sigma]= lognstat(mean,variance)
-    r = icdf('logn', halton, mu, sigma );
-    tol= 1e-6; % Nevo's suggestion: to begin with a big tolerance, with 100 times more iteration, drop 1 digit
+    if sigma>0
+        r = icdf('logn', halton, mu, sigma );
+    else
+        r = meanvalue.*ones(size(halton));
+    end
+    tol= 1e-5; % Nevo's suggestion: to begin with a big tolerance, with 100 times more iteration, drop 1 digit
     diff=1;
     
     % Step2. recover delta
-    delta=log(share)-log(share_outside);
-    while diff>tol 
-        expshare= mktshare(delta, theta);
+    delta=share./share_outside.*exp(price./meanvalue);
+    %delta=ones(131,1);
+    count=1;
+    while diff>tol*ceil(count/100) 
+        expshare= mktshare(delta);
         deltanew= delta.*share./expshare;
         diff =max(abs(deltanew-delta));
         delta= deltanew;
+        count=count+1;
     end
     
     % Step3. find linear parameter
@@ -28,9 +35,9 @@ function f= BlpSupply(theta)
     for i=1:j
         for k=1:j
             if i==k
-                S(i,k)= -mean( 1/r*share(i)*(1-share(k)));
+                S(i,k)= -mean( 1./r.*share(i).*(1-share(k)));
             else
-                S(i,k)= mean( 1/r*share(i)*share(k));
+                S(i,k)= mean( 1./r.*share(i).*share(k));
             end
             if firm_index(i)==firm_index(k)
                 Omega(i,k)=1 ;
@@ -38,9 +45,9 @@ function f= BlpSupply(theta)
         end
     end
     
-    Z= [Z1 Z2 X];
+    Z= [Z3(:,1:2) X];
     mc_blp= price+ (Omega.*S)\share;
-    dep= [ mc_blp; delta ];
+    dep= [ mc_blp; log(delta) ];
     indep= [X,quantity,zeros(size(X,1),size(X,2)); zeros(size([X,quantity],1),size([X,quantity],2)), X];
     instrument=kron(eye(2),Z);
     %[beta1, res1]= ivregression(Y-alpha*price, X, Z);
@@ -53,7 +60,7 @@ function f= BlpSupply(theta)
     gn=resid.*instrument;
     W= inv((gn-mean(gn))'*(gn-mean(gn)));
     
-    [beta_2, resid]= ivregression(dep, indep, instrument, W);
+    [beta_3, resid]= ivregression(dep, indep, instrument, W);
     
     f= resid'*instrument*W*instrument'*resid;
 
