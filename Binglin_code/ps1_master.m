@@ -27,21 +27,6 @@ M = 100*10^6/1000;   % market size
 s = quantity/M; % market shares
 s0 = 1-sum(s);  % outside share
 
-% construct instruments (code directly borrowed from Tianli): 
-X = [weight hp AC];
-% (1) average product characters produced by the same companies
-Z1(J,3)=0;
-Z2(J,3)=0;
-for i=1:J
-    Z1(i,:)= mean( X(firm==firm(i),:), 1);
-end
-% (2) average product characters produced by the rivals
-for i=1:J
-    Z2(i,:)= mean( X(firm~=firm(i),:), 1);
-end
-
-Z=[Z1 Z2];
-
 
 %% 1. Vertical Model
 
@@ -101,6 +86,25 @@ d_firm= dummyvar(firm);
 M = 100*10^6;   % market size
 s = quantity/M; % market shares
 s0 = 1-sum(s);  % outside share
+
+% construct instruments (code directly borrowed from Tianli): 
+X = [weight hp AC];
+% (1) average product characters produced by the same companies
+Z1(J,3)=0;
+Z2(J,3)=0;
+for i=1:J
+    Z1(i,:)= mean( X(firm==firm(i),:), 1);
+end
+% (2) average product characters produced by the rivals
+for i=1:J
+    Z2(i,:)= mean( X(firm~=firm(i),:), 1);
+end
+% (3) optimal instrument by JF Houde
+for i=1:J
+    Z3(i,:)= sum(abs( ones(J,1)*X(i,:)-X ));
+end
+
+Z=[Z1 Z2 Z3];
 
 % First and last indices for each market
 index_begin=zeros(nmk, 1);
@@ -219,14 +223,39 @@ display('linear parameter estimates for constant, price, weight, hp, and AC are'
 beta_hat_IV_2sls
 
 % Code for debugging
-%[theta2_temp, fval, flag, output] = fmincon('WF1_objGMM', 8, [],[],[],[],...
-%        LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
+[theta2_temp, fval, flag, output] = fmincon('WF1_objGMM', 2.5, [],[],[],[],...
+        LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
 
 
 % 3.5 Sensitivity check using multi-start
-theta2w_vec=4*rand(5,1);
+theta2w_vec=20*rand(5,1);
 theta2_vec=nan(length(theta2w_vec),1);
 for k=1:length(theta2w_vec)
     [theta2_vec(k), fval, flag, output] = fmincon('WF1_objGMM', theta2w_vec(k), [],[],[],[],...
         LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
 end
+
+% 3.6 One more exercise:
+% We can actually compare with the case of weak instruments and alpha_2 is
+% weakly identified. The GMM obj is pretty flat and does not search well
+% over the parameter space
+Z = [Z1];
+XMat.Z=Z;
+
+[theta2_temp, fval, flag, output] = fmincon('WF1_objGMM', 3.1, [],[],[],[],...
+        LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
+theta2_temp
+
+[theta2_temp, fval, flag, output] = fmincon('WF1_objGMM', 2.5, [],[],[],[],...
+        LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
+theta2_temp
+
+Z = [Z1 Z2];
+XMat.Z=Z;
+
+[theta2_temp, fval, flag, output] = fmincon('WF1_objGMM', 3.1, [],[],[],[],...
+        LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
+theta2_temp
+[theta2_temp, fval, flag, output] = fmincon('WF1_objGMM', 2.5, [],[],[],[],...
+        LowerBnd,UpperBnd,[], options, Cst, XMat, YMat, MuMat);
+theta2_temp
