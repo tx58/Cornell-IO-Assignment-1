@@ -46,7 +46,7 @@ end
 
 %% 2. Vertical model
 % 2.1 Initialization
-lamda= 1/(4*10^(-6));
+lamda= 1/(4*10^(-6)*1000);
 alpha(j,1)=0;
 delta(j,1)=0;
 alpha(1)= -log(share_outside)/lamda;
